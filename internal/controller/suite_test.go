@@ -58,7 +58,8 @@ func TestControllers(t *testing.T) {
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
-	ctx, cancel = context.WithCancel(context.TODO())
+	// Create a context with proper timeout
+	ctx, cancel = context.WithCancel(context.Background())
 
 	var err error
 	err = nodereadinessiov1alpha1.AddToScheme(scheme.Scheme)
@@ -73,14 +74,20 @@ var _ = BeforeSuite(func() {
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
+		UseExistingCluster:    new(bool), // Ensure we use a test cluster
 	}
 
 	// Retrieve the first found binary directory to allow running tests from IDEs
-	if getFirstFoundEnvTestBinaryDir() != "" {
-		testEnv.BinaryAssetsDirectory = getFirstFoundEnvTestBinaryDir()
+	binaryDir := getFirstFoundEnvTestBinaryDir()
+	if binaryDir != "" {
+		By("Using envtest binaries from: " + binaryDir)
+		testEnv.BinaryAssetsDirectory = binaryDir
+	} else {
+		By("Using default envtest binaries (KUBEBUILDER_ASSETS)")
 	}
 
 	// cfg is defined in this file globally.
+	By("starting test environment")
 	cfg, err = testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
@@ -88,13 +95,46 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
+
+	By("test environment ready")
 })
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
-	cancel()
-	err := testEnv.Stop()
-	Expect(err).NotTo(HaveOccurred())
+
+	// Cancel context first to stop any ongoing operations
+	if cancel != nil {
+		cancel()
+	}
+
+	// Clean up test resources
+	By("cleaning up test resources")
+	if k8sClient != nil {
+		cleanupCtx := context.Background()
+
+		// Delete all NodeReadinessGateRules
+		ruleList := &nodereadinessiov1alpha1.NodeReadinessGateRuleList{}
+		if err := k8sClient.List(cleanupCtx, ruleList); err == nil {
+			for i := range ruleList.Items {
+				k8sClient.Delete(cleanupCtx, &ruleList.Items[i])
+			}
+		}
+
+		// Delete all nodes
+		nodeList := &corev1.NodeList{}
+		if err := k8sClient.List(cleanupCtx, nodeList); err == nil {
+			for i := range nodeList.Items {
+				k8sClient.Delete(cleanupCtx, &nodeList.Items[i])
+			}
+		}
+	}
+
+	// Stop the test environment
+	By("stopping test environment")
+	if testEnv != nil {
+		err := testEnv.Stop()
+		Expect(err).NotTo(HaveOccurred())
+	}
 })
 
 // getFirstFoundEnvTestBinaryDir locates the first binary in the specified path.
@@ -102,20 +142,45 @@ var _ = AfterSuite(func() {
 // controller-runtime. When running tests directly (e.g., via an IDE) without using
 // Makefile targets, the 'BinaryAssetsDirectory' must be explicitly configured.
 //
-// This function streamlines the process by finding the required binaries, similar to
+// This function helps finding the required binaries, equivalent to
 // setting the 'KUBEBUILDER_ASSETS' environment variable. To ensure the binaries are
 // properly set up, run 'make setup-envtest' beforehand.
 func getFirstFoundEnvTestBinaryDir() string {
+	// First check if KUBEBUILDER_ASSETS is already set
+	if assets := os.Getenv("KUBEBUILDER_ASSETS"); assets != "" {
+		if _, err := os.Stat(assets); err == nil {
+			return assets
+		}
+	}
+
+	// Try to find binaries in the expected location
 	basePath := filepath.Join("..", "..", "bin", "k8s")
 	entries, err := os.ReadDir(basePath)
 	if err != nil {
-		logf.Log.Error(err, "Failed to read directory", "path", basePath)
+		// Don't log error here - it's expected in CI environments
 		return ""
 	}
+
 	for _, entry := range entries {
 		if entry.IsDir() {
-			return filepath.Join(basePath, entry.Name())
+			fullPath := filepath.Join(basePath, entry.Name())
+			// Verify that this directory actually contains the required binaries
+			if hasRequiredBinaries(fullPath) {
+				return fullPath
+			}
 		}
 	}
 	return ""
+}
+
+// hasRequiredBinaries checks if the directory contains the essential envtest binaries
+func hasRequiredBinaries(dir string) bool {
+	requiredBinaries := []string{"kube-apiserver", "etcd", "kubectl"}
+	for _, binary := range requiredBinaries {
+		binaryPath := filepath.Join(dir, binary)
+		if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
+			return false
+		}
+	}
+	return true
 }

@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -44,7 +43,6 @@ var _ = Describe("Node Controller", func() {
 		ctx                 context.Context
 		readinessController *ReadinessGateController
 		nodeReconciler      *NodeReconciler
-		scheme              *runtime.Scheme
 		fakeClientset       *fake.Clientset
 		node                *corev1.Node
 		rule                *nodereadinessiov1alpha1.NodeReadinessGateRule
@@ -53,21 +51,18 @@ var _ = Describe("Node Controller", func() {
 
 	BeforeEach(func() {
 		ctx = context.Background()
-		scheme = runtime.NewScheme()
-		Expect(nodereadinessiov1alpha1.AddToScheme(scheme)).To(Succeed())
-		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 
 		fakeClientset = fake.NewSimpleClientset()
 		readinessController = &ReadinessGateController{
 			Client:    k8sClient,
-			Scheme:    scheme,
+			Scheme:    k8sClient.Scheme(),
 			clientset: fakeClientset,
 			ruleCache: make(map[string]*nodereadinessiov1alpha1.NodeReadinessGateRule),
 		}
 
 		nodeReconciler = &NodeReconciler{
 			Client:     k8sClient,
-			Scheme:     scheme,
+			Scheme:     k8sClient.Scheme(),
 			Controller: readinessController,
 		}
 		namespacedName = types.NamespacedName{Name: nodeName}
