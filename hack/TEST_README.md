@@ -28,6 +28,12 @@ The provided Kind configuration creates the 3-node topology with the necessary l
 kind create cluster --config config/testing/kind/kind-config.yaml
 ```
 
+Install CRDs
+
+```bash
+make install
+```
+
 ### Step 2: Build and Load the Controller Image
 
 Build the controller image and load it into the Kind cluster nodes.
@@ -40,7 +46,12 @@ make docker-build IMG=controller:latest
 kind load docker-image controller:latest --name nrg-test
 ```
 
-### Step 3: Verify Controller Deployment
+### Step 3: Controller Deployment
+
+Deploy the controller image to nrg-test-worker
+```bash
+make deploy IMG=controller:latest
+```
 
 Verify the controller is running on the platform node (`nrg-test-worker`):
 ```bash
