@@ -33,99 +33,13 @@ import (
 
 var _ = Describe("Node Controller", func() {
 	const (
-		nodeName      = "test-node"
-		ruleName      = "test-rule"
+		nodeName      = "node-controller-test-node"
+		ruleName      = "node-controller-test-rule"
 		taintKey      = "test-taint"
 		conditionType = "TestCondition"
 	)
 
-	var (
-		ctx                 context.Context
-		readinessController *ReadinessGateController
-		nodeReconciler      *NodeReconciler
-		fakeClientset       *fake.Clientset
-		node                *corev1.Node
-		rule                *nodereadinessiov1alpha1.NodeReadinessGateRule
-		namespacedName      types.NamespacedName
-	)
-
-	BeforeEach(func() {
-		ctx = context.Background()
-
-		fakeClientset = fake.NewSimpleClientset()
-		readinessController = &ReadinessGateController{
-			Client:    k8sClient,
-			Scheme:    k8sClient.Scheme(),
-			clientset: fakeClientset,
-			ruleCache: make(map[string]*nodereadinessiov1alpha1.NodeReadinessGateRule),
-		}
-
-		nodeReconciler = &NodeReconciler{
-			Client:     k8sClient,
-			Scheme:     k8sClient.Scheme(),
-			Controller: readinessController,
-		}
-		namespacedName = types.NamespacedName{Name: nodeName}
-
-		node = &corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   nodeName,
-				Labels: map[string]string{"env": "test"},
-			},
-			Spec: corev1.NodeSpec{
-				Taints: []corev1.Taint{
-					{Key: taintKey, Effect: corev1.TaintEffectNoSchedule},
-				},
-			},
-			Status: corev1.NodeStatus{
-				Conditions: []corev1.NodeCondition{
-					{Type: conditionType, Status: corev1.ConditionFalse},
-				},
-			},
-		}
-
-		rule = &nodereadinessiov1alpha1.NodeReadinessGateRule{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: ruleName,
-			},
-			Spec: nodereadinessiov1alpha1.NodeReadinessGateRuleSpec{
-				Conditions: []nodereadinessiov1alpha1.ConditionRequirement{
-					{Type: conditionType, RequiredStatus: corev1.ConditionTrue},
-				},
-				Taint: nodereadinessiov1alpha1.TaintSpec{
-					Key:    taintKey,
-					Effect: corev1.TaintEffectNoSchedule,
-				},
-				NodeSelector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"env": "test"},
-				},
-			},
-		}
-	})
-
-	JustBeforeEach(func() {
-		Expect(k8sClient.Create(ctx, node)).To(Succeed())
-		Expect(k8sClient.Create(ctx, rule)).To(Succeed())
-
-		// Manually add rule to cache to simulate RuleReconciler
-		readinessController.updateRuleCache(ctx, rule)
-	})
-
-	AfterEach(func() {
-		// Delete node first
-		k8sClient.Delete(ctx, node)
-
-		// Remove finalizers from rule before deleting to avoid stuck deletion
-		updatedRule := &nodereadinessiov1alpha1.NodeReadinessGateRule{}
-		if err := k8sClient.Get(ctx, types.NamespacedName{Name: ruleName}, updatedRule); err == nil {
-			updatedRule.Finalizers = nil
-			k8sClient.Update(ctx, updatedRule)
-		}
-		k8sClient.Delete(ctx, rule)
-
-		readinessController.removeRuleFromCache(ctx, ruleName)
-	})
-
+	// pure function tests
 	Context("Helper function tests", func() {
 		It("should correctly compare node conditions", func() {
 			cond1 := []corev1.NodeCondition{
@@ -183,7 +97,101 @@ var _ = Describe("Node Controller", func() {
 		})
 	})
 
+	// Reconciliation tests need cluster resources
 	Context("when reconciling a node", func() {
+		var (
+			ctx                 context.Context
+			readinessController *ReadinessGateController
+			nodeReconciler      *NodeReconciler
+			fakeClientset       *fake.Clientset
+			node                *corev1.Node
+			rule                *nodereadinessiov1alpha1.NodeReadinessGateRule
+			namespacedName      types.NamespacedName
+		)
+
+		BeforeEach(func() {
+			ctx = context.Background()
+
+			fakeClientset = fake.NewSimpleClientset()
+			readinessController = &ReadinessGateController{
+				Client:    k8sClient,
+				Scheme:    k8sClient.Scheme(),
+				clientset: fakeClientset,
+				ruleCache: make(map[string]*nodereadinessiov1alpha1.NodeReadinessGateRule),
+			}
+
+			nodeReconciler = &NodeReconciler{
+				Client:     k8sClient,
+				Scheme:     k8sClient.Scheme(),
+				Controller: readinessController,
+			}
+			namespacedName = types.NamespacedName{Name: nodeName}
+
+			node = &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   nodeName,
+					Labels: map[string]string{"env": "test"},
+				},
+				Spec: corev1.NodeSpec{
+					Taints: []corev1.Taint{
+						{Key: taintKey, Effect: corev1.TaintEffectNoSchedule},
+					},
+				},
+				Status: corev1.NodeStatus{
+					Conditions: []corev1.NodeCondition{
+						{Type: conditionType, Status: corev1.ConditionFalse},
+					},
+				},
+			}
+
+			rule = &nodereadinessiov1alpha1.NodeReadinessGateRule{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: ruleName,
+				},
+				Spec: nodereadinessiov1alpha1.NodeReadinessGateRuleSpec{
+					Conditions: []nodereadinessiov1alpha1.ConditionRequirement{
+						{Type: conditionType, RequiredStatus: corev1.ConditionTrue},
+					},
+					Taint: nodereadinessiov1alpha1.TaintSpec{
+						Key:    taintKey,
+						Effect: corev1.TaintEffectNoSchedule,
+					},
+					NodeSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"env": "test"},
+					},
+				},
+			}
+		})
+
+		JustBeforeEach(func() {
+			Expect(k8sClient.Create(ctx, node)).To(Succeed())
+			Expect(k8sClient.Create(ctx, rule)).To(Succeed())
+
+			// Manually add rule to cache to simulate RuleReconciler
+			readinessController.updateRuleCache(ctx, rule)
+		})
+
+		AfterEach(func() {
+			// Delete node first
+			_ = k8sClient.Delete(ctx, node)
+
+			// Remove finalizers and delete rule
+			updatedRule := &nodereadinessiov1alpha1.NodeReadinessGateRule{}
+			if err := k8sClient.Get(ctx, types.NamespacedName{Name: ruleName}, updatedRule); err == nil {
+				updatedRule.Finalizers = nil
+				_ = k8sClient.Update(ctx, updatedRule)
+				_ = k8sClient.Delete(ctx, updatedRule)
+			}
+
+			// Wait for deletion to complete before next test
+			Eventually(func() error {
+				return k8sClient.Get(ctx, types.NamespacedName{Name: ruleName}, &nodereadinessiov1alpha1.NodeReadinessGateRule{})
+			}, time.Second*10).ShouldNot(Succeed())
+
+			// Remove rule from cache
+			readinessController.removeRuleFromCache(ctx, ruleName)
+		})
+
 		When("in bootstrap-only mode", func() {
 			BeforeEach(func() {
 				rule.Spec.EnforcementMode = nodereadinessiov1alpha1.EnforcementModeBootstrapOnly
