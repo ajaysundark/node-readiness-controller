@@ -96,6 +96,13 @@ func (r *ReadinessGateController) processNodeAgainstAllRules(ctx context.Context
 			// Continue with other rules even if one fails
 			r.recordNodeFailure(rule, node.Name, "EvaluationError", err.Error())
 		}
+
+		// Persist the rule status
+		if err := r.updateRuleStatus(ctx, rule); err != nil {
+			log.Error(err, "Failed to update rule status after node evaluation",
+				"node", node.Name, "rule", rule.Name)
+			// continue with other rules
+		}
 	}
 
 	return nil
@@ -181,35 +188,6 @@ func (r *ReadinessGateController) markBootstrapCompleted(ctx context.Context, no
 	} else {
 		log.Info("Marked bootstrap completed", "node", nodeName, "rule", ruleName)
 	}
-}
-
-// updateNodeEvaluationStatus updates the evaluation status for a specific node
-func (r *ReadinessGateController) updateNodeEvaluationStatus(
-	rule *readinessv1alpha1.NodeReadinessGateRule,
-	nodeName string,
-	conditionResults []readinessv1alpha1.ConditionEvaluationResult,
-	taintStatus string,
-) {
-	// Find existing evaluation or create new
-	var nodeEval *readinessv1alpha1.NodeEvaluation
-	for i := range rule.Status.NodeEvaluations {
-		if rule.Status.NodeEvaluations[i].NodeName == nodeName {
-			nodeEval = &rule.Status.NodeEvaluations[i]
-			break
-		}
-	}
-
-	if nodeEval == nil {
-		rule.Status.NodeEvaluations = append(rule.Status.NodeEvaluations, readinessv1alpha1.NodeEvaluation{
-			NodeName: nodeName,
-		})
-		nodeEval = &rule.Status.NodeEvaluations[len(rule.Status.NodeEvaluations)-1]
-	}
-
-	// Update evaluation
-	nodeEval.ConditionResults = conditionResults
-	nodeEval.TaintStatus = taintStatus
-	nodeEval.LastEvaluated = metav1.Now()
 }
 
 // recordNodeFailure records a failure for a specific node

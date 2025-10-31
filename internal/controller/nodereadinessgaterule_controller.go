@@ -28,9 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
-	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -56,11 +53,6 @@ type ReadinessGateController struct {
 	// Cache for efficient rule lookup
 	ruleCacheMutex sync.RWMutex
 	ruleCache      map[string]*readinessv1alpha1.NodeReadinessGateRule // ruleName -> rule
-
-	workqueue workqueue.TypedRateLimitingInterface[string]
-
-	nodeLister  corelisters.NodeLister
-	nodesSynced cache.InformerSynced
 
 	// Global dry run mode (emergency off-switch)
 	globalDryRun bool
@@ -225,20 +217,32 @@ func (r *ReadinessGateController) processAllNodesForRule(ctx context.Context, ru
 
 	log.Info("Processing all nodes for rule", "rule", rule.Name, "totalNodes", len(nodeList.Items))
 
-	processedCount := 0
+	var appliedNodes []string
+	var completedNodes []string
 	for _, node := range nodeList.Items {
 		if r.ruleAppliesTo(ctx, rule, &node) {
-			processedCount++
+			appliedNodes = append(appliedNodes, node.Name)
 			log.Info("Processing node for rule", "rule", rule.Name, "node", node.Name)
 			if err := r.evaluateRuleForNode(ctx, rule, &node); err != nil {
 				// Log error but continue with other nodes
 				log.Error(err, "Failed to evaluate node for rule", "rule", rule.Name, "node", node.Name)
 				r.recordNodeFailure(rule, node.Name, "EvaluationError", err.Error())
 			}
+			// Check if bootstrap completed for bootstrap-only rules
+			if rule.Spec.EnforcementMode == readinessv1alpha1.EnforcementModeBootstrapOnly {
+				if r.isBootstrapCompleted(node.Name, rule.Name) {
+					completedNodes = append(completedNodes, node.Name)
+				}
+			}
 		}
 	}
 
-	log.Info("Completed processing nodes for rule", "rule", rule.Name, "processedCount", processedCount)
+	// Update status
+	rule.Status.ObservedGeneration = rule.Generation
+	rule.Status.AppliedNodes = appliedNodes
+	rule.Status.CompletedNodes = completedNodes
+
+	log.Info("Completed processing nodes for rule", "rule", rule.Name, "processedCount", len(appliedNodes))
 	return nil
 }
 
@@ -318,6 +322,35 @@ func (r *ReadinessGateController) evaluateRuleForNode(ctx context.Context, rule 
 	return nil
 }
 
+// updateNodeEvaluationStatus updates the evaluation status for a specific node
+func (r *ReadinessGateController) updateNodeEvaluationStatus(
+	rule *readinessv1alpha1.NodeReadinessGateRule,
+	nodeName string,
+	conditionResults []readinessv1alpha1.ConditionEvaluationResult,
+	taintStatus string,
+) {
+	// Find existing evaluation or create new
+	var nodeEval *readinessv1alpha1.NodeEvaluation
+	for i := range rule.Status.NodeEvaluations {
+		if rule.Status.NodeEvaluations[i].NodeName == nodeName {
+			nodeEval = &rule.Status.NodeEvaluations[i]
+			break
+		}
+	}
+
+	if nodeEval == nil {
+		rule.Status.NodeEvaluations = append(rule.Status.NodeEvaluations, readinessv1alpha1.NodeEvaluation{
+			NodeName: nodeName,
+		})
+		nodeEval = &rule.Status.NodeEvaluations[len(rule.Status.NodeEvaluations)-1]
+	}
+
+	// Update evaluation
+	nodeEval.ConditionResults = conditionResults
+	nodeEval.TaintStatus = taintStatus
+	nodeEval.LastEvaluated = metav1.Now()
+}
+
 // getApplicableRulesForNode returns all rules applicable to a node
 func (r *ReadinessGateController) getApplicableRulesForNode(ctx context.Context, node *corev1.Node) []*readinessv1alpha1.NodeReadinessGateRule {
 	r.ruleCacheMutex.RLock()
@@ -385,33 +418,6 @@ func (r *ReadinessGateController) removeRuleFromCache(ctx context.Context, ruleN
 
 // updateRuleStatus updates the status of a NodeReadinessGateRule
 func (r *ReadinessGateController) updateRuleStatus(ctx context.Context, rule *readinessv1alpha1.NodeReadinessGateRule) error {
-	// Get nodes that this rule applies to
-	nodeList := &corev1.NodeList{}
-	if err := r.List(ctx, nodeList); err != nil {
-		return err
-	}
-
-	var appliedNodes []string
-	var completedNodes []string
-
-	for _, node := range nodeList.Items {
-		if r.ruleAppliesTo(ctx, rule, &node) {
-			appliedNodes = append(appliedNodes, node.Name)
-
-			// Check if bootstrap completed for bootstrap-only rules
-			if rule.Spec.EnforcementMode == readinessv1alpha1.EnforcementModeBootstrapOnly {
-				if r.isBootstrapCompleted(node.Name, rule.Name) {
-					completedNodes = append(completedNodes, node.Name)
-				}
-			}
-		}
-	}
-
-	// Update status
-	rule.Status.ObservedGeneration = rule.Generation
-	rule.Status.AppliedNodes = appliedNodes
-	rule.Status.CompletedNodes = completedNodes
-
 	return r.Status().Update(ctx, rule)
 }
 
