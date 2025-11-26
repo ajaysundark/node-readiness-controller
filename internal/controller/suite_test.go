@@ -34,7 +34,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	nodereadinessiov1alpha1 "github.com/ajaysundark/node-readiness-gate-controller/api/v1alpha1"
+	nodereadinessiov1alpha1 "sigs.k8s.io/node-readiness-controller/api/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 

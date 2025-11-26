@@ -2,7 +2,7 @@
 #
 # This script flips a specific node's readiness condition to the opposite
 # of its current state (True -> False, False -> True), or sets it to a
-# specific state, to test the reaction of the node-readiness-gate-controller.
+# specific state, to test the reaction of the node-readiness-controller.
 #
 # Usage:
 #   ./flip-node-condition.sh <node-name> [condition-type] [true|false]

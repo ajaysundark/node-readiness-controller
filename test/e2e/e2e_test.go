@@ -31,7 +31,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/ajaysundark/node-readiness-gate-controller/test/utils"
+	"sigs.k8s.io/node-readiness-controller/test/utils"
 )
 
 // namespace where the project is deployed in

@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	readinessv1alpha1 "github.com/ajaysundark/node-readiness-gate-controller/api/v1alpha1"
+	readinessv1alpha1 "sigs.k8s.io/node-readiness-controller/api/v1alpha1"
 )
 
 // NodeReconciler reconciles a Node object

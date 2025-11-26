@@ -196,8 +196,8 @@ NodeReadinessController work well with cluster autoscaling:
 
 ```sh
 # Clone the repository
-git clone https://github.com/ajaysundark/node-readiness-gate-controller.git
-cd node-readiness-gate-controller
+git clone https://sigs.k8s.io/node-readiness-controller.git
+cd node-readiness-controller
 
 # Run tests
 make test

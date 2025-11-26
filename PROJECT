@@ -7,14 +7,14 @@ domain: nodereadiness.io
 layout:
 - go.kubebuilder.io/v4
 projectName: nrgcontroller
-repo: github.com/ajaysundark/node-readiness-gate-controller
+repo: sigs.k8s.io/node-readiness-controller
 resources:
 - api:
     crdVersion: v1
   controller: true
   domain: nodereadiness.io
   kind: NodeReadinessGateRule
-  path: github.com/ajaysundark/node-readiness-gate-controller/api/v1alpha1
+  path: sigs.k8s.io/node-readiness-controller/api/v1alpha1
   version: v1alpha1
 - controller: true
   core: true

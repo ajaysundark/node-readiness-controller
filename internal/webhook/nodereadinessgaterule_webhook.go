@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	readinessv1alpha1 "github.com/ajaysundark/node-readiness-gate-controller/api/v1alpha1"
+	readinessv1alpha1 "sigs.k8s.io/node-readiness-controller/api/v1alpha1"
 )
 
 // NodeReadinessGateRuleWebhook validates NodeReadinessGateRule resources

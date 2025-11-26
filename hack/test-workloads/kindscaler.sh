@@ -4,7 +4,7 @@
 # https://github.com/lobuhi/kindscaler/
 #
 # It is modified to specifically support the testing needs of the
-# node-readiness-gate-controller project by only scaling worker nodes
+# node-readiness-controller project by only scaling worker nodes
 # and using a specific node as a template.
 #
 set -euxo pipefail

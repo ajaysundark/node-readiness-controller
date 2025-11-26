@@ -35,10 +35,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	nodereadinessiov1alpha1 "github.com/ajaysundark/node-readiness-gate-controller/api/v1alpha1"
-	"github.com/ajaysundark/node-readiness-gate-controller/internal/controller"
-	"github.com/ajaysundark/node-readiness-gate-controller/internal/info"
-	"github.com/ajaysundark/node-readiness-gate-controller/internal/webhook"
+	nodereadinessiov1alpha1 "sigs.k8s.io/node-readiness-controller/api/v1alpha1"
+	"sigs.k8s.io/node-readiness-controller/internal/controller"
+	"sigs.k8s.io/node-readiness-controller/internal/info"
+	"sigs.k8s.io/node-readiness-controller/internal/webhook"
 	// +kubebuilder:scaffold:imports
 )
 
