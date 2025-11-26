@@ -55,7 +55,7 @@ make deploy IMG=controller:latest
 
 Verify the controller is running on the platform node (`nrg-test-worker`):
 ```bash
-kubectl get pods -n nrgcontroller-system -o wide
+kubectl get pods -n nrg-system -o wide
 ```
 
 ### Step 4: Deploy the Readiness Rule
