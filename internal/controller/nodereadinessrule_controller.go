@@ -30,13 +30,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/source"
-
 	readinessv1alpha1 "sigs.k8s.io/node-readiness-controller/api/v1alpha1"
 )
 
@@ -740,25 +737,9 @@ func removeFinalizer(rule *readinessv1alpha1.NodeReadinessRule, finalizer string
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *RuleReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
-	c, err := controller.New("nodereadiness-controller", mgr, controller.Options{
-		Reconciler:              r,
-		MaxConcurrentReconciles: 1,
-	})
-	if err != nil {
-		return err
-	}
-
-	// Watch for changes to the primary resource NodeReadinessRule
-	err = c.Watch(source.Kind(mgr.GetCache(), &readinessv1alpha1.NodeReadinessRule{},
-		&handler.TypedEnqueueRequestForObject[*readinessv1alpha1.NodeReadinessRule]{},
-		predicate.TypedFuncs[*readinessv1alpha1.NodeReadinessRule]{
-			UpdateFunc: func(tue event.TypedUpdateEvent[*readinessv1alpha1.NodeReadinessRule]) bool {
-				return tue.ObjectOld.GetGeneration() != tue.ObjectNew.GetGeneration() // Only reconcile on spec changes
-			},
-		}))
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return ctrl.NewControllerManagedBy(mgr).
+		Named("nodereadiness-controller").
+		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
+		For(&readinessv1alpha1.NodeReadinessRule{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
+		Complete(r)
 }

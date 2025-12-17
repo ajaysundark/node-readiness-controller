@@ -25,12 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/source"
-
 	readinessv1alpha1 "sigs.k8s.io/node-readiness-controller/api/v1alpha1"
 )
 
@@ -243,46 +241,42 @@ func (r *ReadinessGateController) recordNodeFailure(
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NodeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
-	nodeController, err := ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Node{}).
+	return ctrl.NewControllerManagedBy(mgr).
 		Named("node").
-		Build(r)
-	if err != nil {
-		return err
-	}
-	// Watch node create/update events for readiness taint processing
-	return nodeController.Watch(
-		source.Kind(mgr.GetCache(), &corev1.Node{},
-			&handler.TypedEnqueueRequestForObject[*corev1.Node]{},
-			predicate.TypedFuncs[*corev1.Node]{
-				CreateFunc: func(e event.TypedCreateEvent[*corev1.Node]) bool {
-					log := ctrl.LoggerFrom(ctx)
-					log.V(4).Info("NodeReconciler processing node create event", "node", e.Object.Name)
-					return true
-				},
-				UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Node]) bool {
-					log := ctrl.LoggerFrom(ctx)
-					oldNode := e.ObjectOld
-					newNode := e.ObjectNew
+		For(&corev1.Node{}, builder.WithPredicates(predicate.Funcs{
+			CreateFunc: func(e event.CreateEvent) bool {
+				log := ctrl.LoggerFrom(ctx)
+				n, ok := e.Object.(*corev1.Node)
+				if !ok {
+					log.V(4).Info("Expected Node", "type", fmt.Sprintf("%T", e.Object))
+					return false
+				}
+				log.V(4).Info("NodeReconciler processing node create event", "node", n.GetName())
+				return true
+			},
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				log := ctrl.LoggerFrom(ctx)
+				oldNode := e.ObjectOld.(*corev1.Node)
+				newNode := e.ObjectNew.(*corev1.Node)
 
-					// Only reconcile if conditions or taints changed
-					conditionsChanged := !conditionsEqual(oldNode.Status.Conditions, newNode.Status.Conditions)
-					taintsChanged := !taintsEqual(oldNode.Spec.Taints, newNode.Spec.Taints)
-					labelsChanged := !labelsEqual(oldNode.Labels, newNode.Labels)
+				conditionsChanged := !conditionsEqual(oldNode.Status.Conditions, newNode.Status.Conditions)
+				taintsChanged := !taintsEqual(oldNode.Spec.Taints, newNode.Spec.Taints)
+				labelsChanged := !labelsEqual(oldNode.Labels, newNode.Labels)
 
-					shouldReconcile := conditionsChanged || taintsChanged || labelsChanged
+				shouldReconcile := conditionsChanged || taintsChanged || labelsChanged
 
-					if shouldReconcile {
-						log.V(4).Info("NodeReconciler processing node update event",
-							"node", newNode.Name,
-							"conditionsChanged", conditionsChanged,
-							"taintsChanged", taintsChanged,
-							"labelsChanged", labelsChanged)
-					}
+				if shouldReconcile {
+					log.V(4).Info("NodeReconciler processing node update event",
+						"node", newNode.Name,
+						"conditionsChanged", conditionsChanged,
+						"taintsChanged", taintsChanged,
+						"labelsChanged", labelsChanged)
+				}
 
-					return shouldReconcile
-				},
-			}))
+				return shouldReconcile
+			},
+		})).
+		Complete(r)
 }
 
 // conditionsEqual checks if two condition slices are equal
