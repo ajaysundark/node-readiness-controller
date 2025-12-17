@@ -20,6 +20,6 @@ if [[ -z ${IMG_TAG:-} ]]; then
 fi
 echo "Using IMG_TAG=${IMG_TAG}"
 
-IMG_TAG=${IMG_TAG} IMG_PREFIX=${IMG_PREFIX%/} make docker-build
+IMG_TAG=${IMG_TAG} IMG_PREFIX=${IMG_PREFIX} make docker-build
 
-IMG_TAG=${IMG_TAG} IMG_PREFIX=${IMG_PREFIX%/} make docker-push
+IMG_TAG=${IMG_TAG} IMG_PREFIX=${IMG_PREFIX} make docker-push
