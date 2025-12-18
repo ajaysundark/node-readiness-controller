@@ -7,8 +7,8 @@ The test demonstrates a realistic, production-aligned scenario where critical ad
 ### Test Topology
 
 The test uses a 3-node Kind cluster:
-1.  **`nrr-test-control-plane`**: The Kubernetes control plane.
-2.  **`nrr-test-worker` (Platform Node)**: A dedicated node for running cluster-critical addons. It is labeled `reserved-for=platform` and has a corresponding taint to repel normal application workloads. Cert-manager and the NRR controller will run here.
+1.  **`nrr-test-control-plane`**: The Kubernetes control plane. The NRR controller will run here unless specifically configured.
+2.  **`nrr-test-worker` (Platform Node)**: A dedicated node for running cluster-critical addons. It is labeled `reserved-for=platform` and has a corresponding taint to repel normal application workloads. Cert-manager will run here.
 3.  **`nrr-test-worker2` (Application Node)**: A standard worker node that starts with a `readiness.k8s.io/NetworkReady=pending:NoSchedule` taint, simulating a node that is not yet ready for application traffic.
 
 ## Running the Test
@@ -53,7 +53,7 @@ Deploy the controller image to nrr-test-worker
 make deploy IMG_PREFIX=controller IMG_TAG=latest
 ```
 
-Verify the controller is running on the platform node (`nrr-test-worker`):
+Verify the controller is running on the control plane node (`nrr-test-control-plane`):
 ```bash
 kubectl get pods -n nrr-system -o wide
 ```
