@@ -15,7 +15,7 @@ The Node Readiness Controller extends Kubernetes' node readiness model by allowi
 
 ## Why This Project?
 
-Kubernetes node has a simple "Ready" condition. Modern workloads need more crtical infrastructure dependencies before they can run.
+Kubernetes node has a simple "Ready" condition. Modern workloads need more critical infrastructure dependencies before they can run.
 
 With this controller you can:
 - Define custom readiness for your workload
