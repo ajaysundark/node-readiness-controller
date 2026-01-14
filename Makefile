@@ -208,10 +208,16 @@ docker-buildx-reporter: ## Build and push docker image for the reporter for cros
 	- $(CONTAINER_TOOL) buildx rm reporter-builder
 
 .PHONY: build-installer
-build-installer: manifests generate $(KUSTOMIZE) ## Generate a consolidated YAML with CRDs and deployment.
+build-installer: manifests generate $(KUSTOMIZE) ## Generate CRDs and deployment manifests for release.
 	mkdir -p dist
+	# Generate CRDs only
+	$(KUSTOMIZE) build config/crd > dist/crds.yaml
+	@echo "Generated dist/crds.yaml"
+	# Generate controller deployment without CRDs
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG_PREFIX}:${IMG_TAG}
 	$(KUSTOMIZE) build config/default > dist/install.yaml
+	@echo "Generated dist/install.yaml with image ${IMG_PREFIX}:${IMG_TAG}"
+	@echo "NOTE: Install crds.yaml first, then install.yaml. Deployment runs on any available node by default."
 
 ## --------------------------------------
 ## Deployment
