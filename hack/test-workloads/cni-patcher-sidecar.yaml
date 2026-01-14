@@ -1,6 +1,5 @@
 name: cni-status-patcher
-# TODO: Update to use the new reporter image once published
-image: ghcr.io/ajaysundark/readiness-condition-reporter:0.1.1
+image: registry.k8s.io/node-readiness-controller/node-readiness-reporter:v0.1.0
 imagePullPolicy: IfNotPresent
 env:
   - name: NODE_NAME
