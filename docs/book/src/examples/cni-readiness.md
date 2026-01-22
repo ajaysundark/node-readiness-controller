@@ -1,24 +1,18 @@
-# CNI Readiness Guardrail
-
-This guide demonstrates how to use the Node Readiness Controller to prevent pods from being scheduled on a node until the Container Network Interface (CNI) plugin (e.g., Calico) is fully initialized and ready.
-
-## The Problem
+# CNI Readiness
 
 In many Kubernetes clusters, the CNI plugin runs as a DaemonSet. When a new node joins the cluster, there is a race condition:
 1.  The Node object is created and marked `Ready` by the Kubelet.
 2.  The Scheduler sees the node as `Ready` and schedules application pods.
-3.  **However**, the CNI DaemonSet might still be initializing networking on that node.
+3.  However, the CNI DaemonSet might still be initializing networking on that node.
 
-**Result**: Application pods fail to start (Sandbox creation errors) or start with networking issues because the CNI isn't ready yet.
+This guide demonstrates how to use the Node Readiness Controller to prevent pods from being scheduled on a node until the Container Network Interface (CNI) plugin (e.g., Calico) is fully initialized and ready.
 
-## The Solution
+The high-level steps are:
+1.  Node is bootstrapped with a [startup taint](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/) `readiness.k8s.io/NetworkReady=pending:NoSchedule` immediately upon joining.
+2.  A sidecar is patched to the cni-agent to monitor the CNI's health and report it to the API server as node-condition (`network.k8s.io/CalicoReady`). 
+3. Node Readiness Controller will untaint the node only when the CNI reports it is ready.
 
-We can use the Node Readiness Controller to inject a "guardrail":
-1.  **Taint** the node with a [startup taint](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/) `readiness.k8s.io/NetworkReady=pending:NoSchedule` immediately upon joining.
-2.  **Monitor** the CNI's health using a sidecar reporter.
-3.  **Untaint** the node only when the CNI reports it is ready.
-
-## Step-by-Step Guide (Calico Example)
+## Step-by-Step Guide
 
 This example uses **Calico**, but the pattern applies to any CNI.
 
@@ -43,11 +37,11 @@ This sidecar checks Calico's local health endpoint (`http://localhost:9099/readi
         fieldRef:
           fieldPath: spec.nodeName
     - name: CHECK_ENDPOINT
-      value: "http://localhost:9099/readiness" # Update the right CNI health endpoint
+      value: "http://localhost:9099/readiness" # update to your CNI health endpoint
     - name: CONDITION_TYPE
-      value: "network.k8s.io/CalicoReady"     # Update the right condition
+      value: "network.k8s.io/CalicoReady"     # update this node condition
     - name: CHECK_INTERVAL
-      value: "5s"
+      value: "15s"
   resources:
     limits:
       cpu: "10m"
@@ -113,7 +107,6 @@ spec:
     value: "pending"
   
   # "bootstrap-only" means: once the CNI is ready once, we stop enforcing.
-  # Use "continuous" mode if you want to taint the node if CNI crashes later. 
   enforcementMode: "bootstrap-only"
   
   # Update to target only the nodes that need to be protected by this guardrail
@@ -122,7 +115,7 @@ spec:
       node-role.kubernetes.io/worker: ""
 ```
 
-## How to Apply
+## Test scripts
 
 1.  **Create the Readiness Rule**:
     ```sh
@@ -135,7 +128,6 @@ spec:
     chmod +x apply-calico.sh
     sh apply-calico.sh
     ```
-
 
 
 ## Verification
