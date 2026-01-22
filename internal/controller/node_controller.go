@@ -162,6 +162,8 @@ func (r *RuleReadinessController) processNodeAgainstAllRules(ctx context.Context
 				return err
 			}
 
+			patch := client.MergeFrom(latestRule.DeepCopy())
+
 			// update only this specific node evaluation status
 			currEval := readinessv1alpha1.NodeEvaluation{}
 			for _, eval := range rule.Status.NodeEvaluations {
@@ -200,7 +202,7 @@ func (r *RuleReadinessController) processNodeAgainstAllRules(ctx context.Context
 			}
 			latestRule.Status.FailedNodes = updatedFailedNodes
 
-			return r.Status().Update(ctx, latestRule)
+			return r.Status().Patch(ctx, latestRule, patch)
 		})
 
 		if err != nil {
