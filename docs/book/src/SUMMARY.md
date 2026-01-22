@@ -11,7 +11,7 @@
 
 # Examples
 
-[CNI Installation](./examples/cni-readiness.md)
+- [CNI Installation](./examples/cni-readiness.md)
 <!-- - [Storage Drivers](./examples/storage-readiness.md) -->
 <!-- - [Security Agent](./examples/security-agent-readiness.md) -->
 <!-- - [Device Drivers](./examples/dra-readiness.md) -->
@@ -20,7 +20,7 @@
 
 - [Release Notes](./releases.md)
 
-# Operations
+<!-- # Operations -->
 
 <!-- - [Monitoring](./operations/monitoring.md) -->
 <!-- - [Troubleshooting](./operations/troubleshooting.md) -->
