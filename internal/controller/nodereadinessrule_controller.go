@@ -247,8 +247,9 @@ func (r *RuleReadinessController) cleanupDeletedNodes(ctx context.Context, rule 
 			return nil
 		}
 
+		patch := client.MergeFrom(fresh.DeepCopy())
 		fresh.Status.NodeEvaluations = freshNodeEvaluations
-		return r.Status().Update(ctx, fresh)
+		return r.Status().Patch(ctx, fresh, patch)
 	})
 }
 
@@ -472,22 +473,22 @@ func (r *RuleReadinessController) updateRuleStatus(ctx context.Context, rule *re
 			return err
 		}
 
-		// Merge our status updates into fresh version
-		// This ensures we're updating based on the latest resourceVersion
+		patch := client.MergeFrom(latestRule.DeepCopy())
+
 		latestRule.Status.NodeEvaluations = rule.Status.NodeEvaluations
 		latestRule.Status.AppliedNodes = rule.Status.AppliedNodes
 		latestRule.Status.FailedNodes = rule.Status.FailedNodes
 		latestRule.Status.ObservedGeneration = rule.Status.ObservedGeneration
 		latestRule.Status.DryRunResults = rule.Status.DryRunResults
 
-		if err := r.Status().Update(ctx, latestRule); err != nil {
-			log.V(1).Info("Status update conflict, will retry",
+		if err := r.Status().Patch(ctx, latestRule, patch); err != nil {
+			log.V(1).Info("Status patch conflict, will retry",
 				"rule", rule.Name,
 				"error", err.Error())
 			return err
 		}
 
-		log.V(1).Info("Successfully updated rule status", "rule", rule.Name)
+		log.V(1).Info("Successfully patched rule status", "rule", rule.Name)
 		return nil
 	})
 }
