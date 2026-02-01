@@ -9,7 +9,7 @@ This guide demonstrates how to use the Node Readiness Controller to prevent pods
 
 The high-level steps are:
 1.  Node is bootstrapped with a [startup taint](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/) `readiness.k8s.io/NetworkReady=pending:NoSchedule` immediately upon joining.
-2.  A sidecar is patched to the cni-agent to monitor the CNI's health and report it to the API server as node-condition (`network.k8s.io/CalicoReady`). 
+2.  A reporter DaemonSet is deployed to monitor the CNI's health and report it to the API server as node-condition (`network.k8s.io/CalicoReady`). 
 3. Node Readiness Controller will untaint the node only when the CNI reports it is ready.
 
 ## Step-by-Step Guide
@@ -20,43 +20,42 @@ This example uses **Calico**, but the pattern applies to any CNI.
 
 ### 1. Deploy the Readiness Condition Reporter
 
-We need to bridge Calico's internal health status to a Kubernetes Node Condition. We will add a **sidecar container** to the Calico DaemonSet.
+We need to bridge Calico's internal health status to a Kubernetes Node Condition. We will deploy a **reporter DaemonSet** that runs on every node.
 
-This sidecar checks Calico's local health endpoint (`http://localhost:9099/readiness`) and updates a node condition `network.k8s.io/CalicoReady`.
+This reporter checks Calico's local health endpoint (`http://localhost:9099/readiness`) and updates a node condition `network.k8s.io/CalicoReady`.
 
-**Patch your Calico DaemonSet:**
+Using a separate DaemonSet instead of a sidecar ensures that readiness reporting works even if the CNI pod is crashlooping or failing to start containers.
+
+**Deploy the Reporter DaemonSet:**
 
 ```yaml
-# cni-patcher-sidecar.yaml
-- name: cni-status-patcher
-  image: registry.k8s.io/node-readiness-controller/node-readiness-reporter:v0.1.1
-  imagePullPolicy: IfNotPresent
-  env:
-    - name: NODE_NAME
-      valueFrom:
-        fieldRef:
-          fieldPath: spec.nodeName
-    - name: CHECK_ENDPOINT
-      value: "http://localhost:9099/readiness" # update to your CNI health endpoint
-    - name: CONDITION_TYPE
-      value: "network.k8s.io/CalicoReady"     # update this node condition
-    - name: CHECK_INTERVAL
-      value: "15s"
-  resources:
-    limits:
-      cpu: "10m"
-      memory: "32Mi"
-    requests:
-      cpu: "10m"
-      memory: "32Mi"
+# cni-reporter-ds.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cni-reporter
+  namespace: kube-system
+spec:
+  # ...
+  template:
+    spec:
+      hostNetwork: true
+      serviceAccountName: cni-reporter
+      tolerations:
+      - operator: Exists
+      containers:
+      - name: cni-status-patcher
+        image: registry.k8s.io/node-readiness-controller/node-readiness-reporter:v0.1.1
+        env:
+          - name: CHECK_ENDPOINT
+            value: "http://localhost:9099/readiness"
+          - name: CONDITION_TYPE
+            value: "network.k8s.io/CalicoReady"
 ```
-
-  > Note: In this example, the CNI pod health is monitored by a side-car, so watcher's lifecycle is same as the pod lifecycle.
-  If the Calico pod is crashlooping, the sidecar will not run and cannot report readiness. For robust 'continuous' readiness reporting, the watcher should be 'external' to the pod.
 
 ### 2. Grant Permissions (RBAC)
 
-The sidecar needs permission to update the Node object's status.
+The reporter needs permission to update the Node object's status.
 
 ```yaml
 # calico-rbac-node-status-patch-role.yaml
@@ -78,9 +77,9 @@ roleRef:
   kind: ClusterRole
   name: node-status-patch-role
 subjects:
-# Bind to CNI's ServiceAccount
+# Bind to CNI Reporter's ServiceAccount
 - kind: ServiceAccount
-  name: calico-node
+  name: cni-reporter
   namespace: kube-system
 ```
 
@@ -140,7 +139,7 @@ To test this, add a new node to the cluster.
 
 2.  **Check Node Conditions**:
     Watch the node conditions. You will initially see `network.k8s.io/CalicoReady` as `False` or missing.
-    Once Calico starts, the sidecar will update it to `True`.
+    Once Calico starts, the reporter will update it to `True`.
 
 3.  **Check Taint Removal**:
     As soon as the condition becomes `True`, the Node Readiness Controller will remove the taint, and workloads will be scheduled.

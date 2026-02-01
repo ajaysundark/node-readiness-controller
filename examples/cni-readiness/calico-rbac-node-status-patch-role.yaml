@@ -16,6 +16,7 @@ roleRef:
   kind: ClusterRole
   name: node-status-patch-role
 subjects:
+# Bind to CNI Reporter's ServiceAccount
 - kind: ServiceAccount
-  name: calico-node
+  name: cni-reporter
   namespace: kube-system
