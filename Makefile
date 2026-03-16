@@ -14,6 +14,9 @@
 
 .DEFAULT_GOAL:=help
 
+# Force using a specific toolchain version to avoid issues with local installations.
+export GOTOOLCHAIN := go1.25.8
+
 #
 # Directories.
 #
@@ -455,7 +458,7 @@ $(GOLANGCI_LINT_KAL): $(GOLANGCI_LINT) # Build golangci-lint-kal from custom con
 ##@ docs
 
 MDBOOK_VERSION ?= 0.5.2
-GO_VERSION ?= 1.25.5
+GO_VERSION ?= 1.25.8
 MDBOOK_SCRIPT := $(ROOT_DIR)/docs/book/install-and-build-mdbook.sh
 
 

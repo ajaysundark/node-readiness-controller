@@ -1,10 +1,10 @@
 [build]
   base = "docs/book"
-  command = "GO_VERSION=1.25.5 MDBOOK_VERSION=0.5.2 ./install-and-build-mdbook.sh"
+  command = "GO_VERSION=1.25.8 MDBOOK_VERSION=0.5.2 ./install-and-build-mdbook.sh"
   publish = "book"
 
 [context.deploy-preview]
-  command = "GO_VERSION=1.25.5 MDBOOK_VERSION=0.5.2 ./install-and-build-mdbook.sh"
+  command = "GO_VERSION=1.25.8 MDBOOK_VERSION=0.5.2 ./install-and-build-mdbook.sh"
 
 [[redirects]]
   from = "/*"
