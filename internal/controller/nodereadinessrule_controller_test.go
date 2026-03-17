@@ -499,7 +499,7 @@ var _ = Describe("NodeReadinessRule Controller", func() {
 			ruleName := "bootstrap-test-rule"
 
 			// Initially not completed
-			completed := readinessController.isBootstrapCompleted(nodeName, ruleName)
+			completed := readinessController.isBootstrapCompleted(ctx, nodeName, ruleName)
 			Expect(completed).To(BeFalse())
 
 			// Create a node for testing
@@ -516,8 +516,63 @@ var _ = Describe("NodeReadinessRule Controller", func() {
 
 			// Should now be completed
 			Eventually(func() bool {
-				return readinessController.isBootstrapCompleted(nodeName, ruleName)
+				return readinessController.isBootstrapCompleted(ctx, nodeName, ruleName)
 			}).Should(BeTrue())
+		})
+
+		It("should return false when context is cancelled", func() {
+			nodeName := "bootstrap-ctx-test-node"
+			ruleName := "bootstrap-ctx-test-rule"
+
+			// Create a node with the bootstrap annotation already set
+			node := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: nodeName,
+					Annotations: map[string]string{
+						"readiness.k8s.io/bootstrap-completed-" + ruleName: "true",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, node)).To(Succeed())
+			defer func() { _ = k8sClient.Delete(ctx, node) }()
+
+			// Verify it returns true with a valid context
+			Expect(readinessController.isBootstrapCompleted(ctx, nodeName, ruleName)).To(BeTrue())
+
+			// A cancelled context should cause the Get to fail, returning false
+			cancelledCtx, cancel := context.WithCancel(ctx)
+			cancel()
+			Expect(readinessController.isBootstrapCompleted(cancelledCtx, nodeName, ruleName)).To(BeFalse())
+		})
+
+		It("should set bootstrap annotation via patch in markBootstrapCompleted", func() {
+			nodeName := "bootstrap-patch-test-node"
+			ruleName := "bootstrap-patch-test-rule"
+
+			// Create a node with existing annotations that should be preserved
+			node := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: nodeName,
+					Annotations: map[string]string{
+						"existing-annotation": "should-be-preserved",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, node)).To(Succeed())
+			defer func() { _ = k8sClient.Delete(ctx, node) }()
+
+			// Mark bootstrap completed
+			readinessController.markBootstrapCompleted(ctx, nodeName, ruleName)
+
+			// Verify annotation was added and existing annotation is preserved
+			Eventually(func(g Gomega) {
+				updatedNode := &corev1.Node{}
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: nodeName}, updatedNode)).To(Succeed())
+				g.Expect(updatedNode.Annotations).To(HaveKeyWithValue(
+					"readiness.k8s.io/bootstrap-completed-"+ruleName, "true"))
+				g.Expect(updatedNode.Annotations).To(HaveKeyWithValue(
+					"existing-annotation", "should-be-preserved"))
+			}).Should(Succeed())
 		})
 	})
 
