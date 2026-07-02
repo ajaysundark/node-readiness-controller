@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -90,7 +90,7 @@ var _ = Describe("NodeReadinessRule Controller", func() {
 			Scheme:        scheme,
 			clientset:     fakeClientset,
 			ruleCache:     make(map[string]*nodereadinessiov1alpha1.NodeReadinessRule),
-			EventRecorder: record.NewFakeRecorder(10),
+			EventRecorder: events.NewFakeRecorder(10),
 		}
 
 		ruleReconciler = &RuleReconciler{
@@ -2163,7 +2163,7 @@ var _ = Describe("NodeReadinessRule Controller", func() {
 				Scheme:        scheme,
 				clientset:     fakeClientset,
 				ruleCache:     make(map[string]*nodereadinessiov1alpha1.NodeReadinessRule),
-				EventRecorder: record.NewFakeRecorder(10),
+				EventRecorder: events.NewFakeRecorder(10),
 			}
 
 			nodeList := &corev1.NodeList{Items: []corev1.Node{*failNode}}
@@ -2220,7 +2220,7 @@ var _ = Describe("NodeReadinessRule Controller", func() {
 				Scheme:        scheme,
 				clientset:     fakeClientset,
 				ruleCache:     make(map[string]*nodereadinessiov1alpha1.NodeReadinessRule),
-				EventRecorder: record.NewFakeRecorder(10),
+				EventRecorder: events.NewFakeRecorder(10),
 			}
 
 			nodeList := &corev1.NodeList{Items: []corev1.Node{*successNode}}
