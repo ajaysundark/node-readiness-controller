@@ -651,6 +651,7 @@ var _ = Describe("Node Controller", func() {
 			Expect(nodeEval.ConditionResults[0].Type).To(Equal("StatusTestCondition"))
 			Expect(nodeEval.ConditionResults[0].CurrentStatus).To(Equal(corev1.ConditionFalse))
 			Expect(nodeEval.ConditionResults[0].RequiredStatus).To(Equal(corev1.ConditionTrue))
+			Expect(nodeEval.ConditionResults[0].DefaultStatus).To(Equal(corev1.ConditionUnknown))
 			Expect(nodeEval.TaintStatus).To(Equal(nodereadinessiov1alpha1.TaintStatusPresent))
 			Expect(nodeEval.LastEvaluationTime.IsZero()).To(BeFalse(), "LastEvaluationTime should be set")
 		})

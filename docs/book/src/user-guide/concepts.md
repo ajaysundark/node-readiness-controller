@@ -24,6 +24,29 @@ Typical taint keys look like:
 
 The segment after `readiness.k8s.io/` should describe the dependency or subsystem whose readiness is being guarded (for example, a CNI plugin, storage backend, or security agent). Treat this domain as reserved for the controller and closely related components, and avoid reusing it for unrelated taints.
 
+### Default Condition Status (`defaultStatus`)
+
+When defining readiness conditions, you can configure an optional `defaultStatus` field (one of `True`, `False`, or `Unknown`) under `spec.conditions[]`. This field determines how a condition is evaluated when it is completely absent from the Node's status.
+
+If `defaultStatus` is omitted, the controller assumes a fallback status of `Unknown`.
+
+#### Use Case: Problem Gating (Default-Allow)
+By default, the controller operates in a "default-deny" fashion. If a guarded condition is missing from a new node, it resolves to `Unknown`, which typically does not satisfy `requiredStatus: True` or `requiredStatus: False`, causing the node to be tainted.
+
+However, for problem-detection conditions (like those reported by Node Problem Detector), you want a "default-allow" behavior: the node should start as healthy, and only be tainted if the problem condition explicitly triggers (e.g., `MaintenanceRequired=True`). 
+
+By setting `requiredStatus: False` and `defaultStatus: False`, an absent `MaintenanceRequired` condition evaluates to `False`. It matches the required status, allowing the node to bootstrap without being blocked by race conditions or initialization delays.
+
+#### Important Implication: Enforcement Modes
+The choice of `defaultStatus` has critical interaction with the rule's `enforcementMode`:
+
+> [!WARNING]
+> **Do not use a satisfying `defaultStatus` with `bootstrap-only` rules.**
+> 
+> If a rule is `bootstrap-only` and the absent condition evaluates to a status that matches `requiredStatus` (e.g. `requiredStatus: False` and `defaultStatus: False`), the controller will immediately mark the bootstrap as completed (`bootstrap-completed-<ruleName>=true`) and remove the taint. 
+> 
+> Since `bootstrap-only` rules are never re-evaluated once marked complete, the gate is permanently bypassed, even if a reporter eventually updates the condition to an unsatisfied status. For `bootstrap-only` rules, leaving the default status as `Unknown` is almost always the correct approach to guarantee the controller waits for the actual condition to be reported.
+
 ## Enforcement Modes
 
 The controller supports two distinct modes of enforcement, configured via `spec.enforcementMode`, to handle different operational needs.
