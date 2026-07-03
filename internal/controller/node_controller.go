@@ -39,8 +39,8 @@ import (
 // NodeReconciler reconciles a Node object.
 type NodeReconciler struct {
 	client.Client
-	Scheme     *runtime.Scheme
-	Controller *RuleReadinessController
+	Scheme                  *runtime.Scheme
+	Controller              *RuleReadinessController
 	MaxConcurrentReconciles int // caps how many nodes are reconciled concurrently
 }
 

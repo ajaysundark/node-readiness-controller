@@ -64,8 +64,8 @@ type RuleReadinessController struct {
 // RuleReconciler handles NodeReadinessRule reconciliation.
 type RuleReconciler struct {
 	client.Client
-	Scheme     *runtime.Scheme
-	Controller *RuleReadinessController
+	Scheme                  *runtime.Scheme
+	Controller              *RuleReadinessController
 	MaxConcurrentReconciles int // caps how many rules are reconciled concurrently
 }
 
