@@ -408,7 +408,7 @@ func (r *RuleReadinessController) evaluateRuleForNode(ctx context.Context, rule 
 
 		// Mark bootstrap completed if bootstrap-only mode
 		if rule.Spec.EnforcementMode == readinessv1alpha1.EnforcementModeBootstrapOnly {
-			r.markBootstrapCompleted(ctx, node.Name, rule.Name)
+			r.markBootstrapCompleted(ctx, node.Name, rule.Name, rule.GetUID())
 
 			// Only record the bootstrap duration if the node was created AFTER the rule.
 			// This prevents legacy nodes from poisoning the histogram with massive outliers.
@@ -449,6 +449,10 @@ func (r *RuleReadinessController) evaluateRuleForNode(ctx context.Context, rule 
 	default:
 		log.Info("No taint action needed", "node", node.Name, "rule", rule.Name,
 			"shouldRemove", shouldRemoveTaint, "hasTaint", currentlyHasTaint)
+		// Mark bootstrap completed if bootstrap-only mode
+		if rule.Spec.EnforcementMode == readinessv1alpha1.EnforcementModeBootstrapOnly {
+			r.markBootstrapCompleted(ctx, node.Name, rule.Name, rule.GetUID())
+		}
 	}
 
 	// Determine observed taint status after any actions

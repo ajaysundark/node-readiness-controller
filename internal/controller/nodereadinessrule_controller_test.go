@@ -1147,9 +1147,10 @@ var _ = Describe("NodeReadinessRule Controller", func() {
 		It("should handle bootstrap completion tracking", func() {
 			nodeName := "bootstrap-test-node"
 			ruleName := "bootstrap-test-rule"
+			ruleUID := types.UID("11111111-1111-1111-1111-111111111111")
 
 			// Initially not completed
-			completed := readinessController.isBootstrapCompleted(ctx, nodeName, ruleName)
+			completed := readinessController.isBootstrapCompleted(ctx, nodeName, ruleName, ruleUID)
 			Expect(completed).To(BeFalse())
 
 			// Create a node for testing
@@ -1162,24 +1163,25 @@ var _ = Describe("NodeReadinessRule Controller", func() {
 			defer func() { _ = k8sClient.Delete(ctx, node) }()
 
 			// Mark as completed
-			readinessController.markBootstrapCompleted(ctx, nodeName, ruleName)
+			readinessController.markBootstrapCompleted(ctx, nodeName, ruleName, ruleUID)
 
 			// Should now be completed
 			Eventually(func() bool {
-				return readinessController.isBootstrapCompleted(ctx, nodeName, ruleName)
+				return readinessController.isBootstrapCompleted(ctx, nodeName, ruleName, ruleUID)
 			}).Should(BeTrue())
 		})
 
 		It("should return false when context is cancelled", func() {
 			nodeName := "bootstrap-ctx-test-node"
 			ruleName := "bootstrap-ctx-test-rule"
+			ruleUID := types.UID("22222222-2222-2222-2222-222222222222")
 
-			// Create a node with the bootstrap annotation already set
+			// Create a node with the UID-based bootstrap annotation already set
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: nodeName,
 					Annotations: map[string]string{
-						"readiness.k8s.io/bootstrap-completed-" + ruleName: "true",
+						bootstrapAnnotationKey(ruleUID): `{"rule-name":"bootstrap-ctx-test-rule"}`,
 					},
 				},
 			}
@@ -1187,17 +1189,18 @@ var _ = Describe("NodeReadinessRule Controller", func() {
 			defer func() { _ = k8sClient.Delete(ctx, node) }()
 
 			// Verify it returns true with a valid context
-			Expect(readinessController.isBootstrapCompleted(ctx, nodeName, ruleName)).To(BeTrue())
+			Expect(readinessController.isBootstrapCompleted(ctx, nodeName, ruleName, ruleUID)).To(BeTrue())
 
 			// A cancelled context should cause the Get to fail, returning false
 			cancelledCtx, cancel := context.WithCancel(ctx)
 			cancel()
-			Expect(readinessController.isBootstrapCompleted(cancelledCtx, nodeName, ruleName)).To(BeFalse())
+			Expect(readinessController.isBootstrapCompleted(cancelledCtx, nodeName, ruleName, ruleUID)).To(BeFalse())
 		})
 
 		It("should set bootstrap annotation via patch in markBootstrapCompleted", func() {
 			nodeName := "bootstrap-patch-test-node"
 			ruleName := "bootstrap-patch-test-rule"
+			ruleUID := types.UID("33333333-3333-3333-3333-333333333333")
 
 			// Create a node with existing annotations that should be preserved
 			node := &corev1.Node{
@@ -1212,14 +1215,16 @@ var _ = Describe("NodeReadinessRule Controller", func() {
 			defer func() { _ = k8sClient.Delete(ctx, node) }()
 
 			// Mark bootstrap completed
-			readinessController.markBootstrapCompleted(ctx, nodeName, ruleName)
+			readinessController.markBootstrapCompleted(ctx, nodeName, ruleName, ruleUID)
 
-			// Verify annotation was added and existing annotation is preserved
+			// Verify UID-based annotation was added and existing annotation is preserved
 			Eventually(func(g Gomega) {
 				updatedNode := &corev1.Node{}
 				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: nodeName}, updatedNode)).To(Succeed())
-				g.Expect(updatedNode.Annotations).To(HaveKeyWithValue(
-					"readiness.k8s.io/bootstrap-completed-"+ruleName, "true"))
+				g.Expect(updatedNode.Annotations).To(HaveKey(
+					bootstrapAnnotationKey(ruleUID)))
+				g.Expect(updatedNode.Annotations[bootstrapAnnotationKey(ruleUID)]).To(
+					ContainSubstring(ruleName))
 				g.Expect(updatedNode.Annotations).To(HaveKeyWithValue(
 					"existing-annotation", "should-be-preserved"))
 			}).Should(Succeed())
@@ -1228,6 +1233,7 @@ var _ = Describe("NodeReadinessRule Controller", func() {
 		It("should increment bootstrap completed metric only when newly marked", func() {
 			nodeName := "bootstrap-metric-test-node"
 			ruleName := "bootstrap-metric-test-rule"
+			ruleUID := types.UID("44444444-4444-4444-4444-444444444444")
 
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1240,8 +1246,8 @@ var _ = Describe("NodeReadinessRule Controller", func() {
 			counter := metrics.BootstrapCompleted.WithLabelValues(ruleName)
 			before := counterValue(counter)
 
-			readinessController.markBootstrapCompleted(ctx, nodeName, ruleName)
-			readinessController.markBootstrapCompleted(ctx, nodeName, ruleName)
+			readinessController.markBootstrapCompleted(ctx, nodeName, ruleName, ruleUID)
+			readinessController.markBootstrapCompleted(ctx, nodeName, ruleName, ruleUID)
 
 			Expect(counterValue(counter)).To(Equal(before + 1))
 		})
