@@ -29,6 +29,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -39,14 +40,17 @@ import (
 // NodeReconciler reconciles a Node object.
 type NodeReconciler struct {
 	client.Client
-	Scheme     *runtime.Scheme
-	Controller *RuleReadinessController
+	Scheme                  *runtime.Scheme
+	Controller              *RuleReadinessController
+	MaxConcurrentReconciles int // caps how many nodes are reconciled concurrently
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NodeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	concurrency := max(r.MaxConcurrentReconciles, 1)
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("node").
+		WithOptions(controller.Options{MaxConcurrentReconciles: concurrency}).
 		For(&corev1.Node{}, builder.WithPredicates(predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
 				log := ctrl.LoggerFrom(ctx)

@@ -64,8 +64,9 @@ type RuleReadinessController struct {
 // RuleReconciler handles NodeReadinessRule reconciliation.
 type RuleReconciler struct {
 	client.Client
-	Scheme     *runtime.Scheme
-	Controller *RuleReadinessController
+	Scheme                  *runtime.Scheme
+	Controller              *RuleReadinessController
+	MaxConcurrentReconciles int // caps how many rules are reconciled concurrently
 }
 
 // NewRuleReadinessController creates a new controller.
@@ -82,9 +83,10 @@ func NewRuleReadinessController(mgr ctrl.Manager, clientset kubernetes.Interface
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *RuleReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	concurrency := max(r.MaxConcurrentReconciles, 1)
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("nodereadiness-controller").
-		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: concurrency}).
 		For(&readinessv1alpha1.NodeReadinessRule{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		Complete(r)
 }
