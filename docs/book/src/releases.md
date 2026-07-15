@@ -2,11 +2,13 @@
 
 This page details the official releases of the Node Readiness Controller.
 
-## v0.4.0
+## v0.4.1
 
-**Date:** 2026-07-10
+**Date:** 2026-07-12
 
 This release includes critical bug fixes, most notably optimistic locking for taint updates so NRC plays well with other concurrent taint-management controllers like Karpenter, along with bootstrap-mode correctness, handling of long rule names, and reconcile retries. It also adds configurable defaults for missing conditions, letting continuous mode work naturally with problem states — such as those reported by NPD — to keep workloads off nodes where critical readiness is missing.
+
+> **Note:** This release was originally tagged v0.4.0, but the image build for that tag failed to publish. The images were retagged and published as v0.4.1 with no other code changes.
 
 ### Release Notes
 
@@ -46,6 +48,37 @@ This release includes critical bug fixes, most notably optimistic locking for ta
 - Replace blockquotes with admonitions ([#274](https://github.com/kubernetes-sigs/node-readiness-controller/pull/274))
 - Clarify CNI readiness reporter as DaemonSet instead of sidecar ([#181](https://github.com/kubernetes-sigs/node-readiness-controller/pull/181))
 - Add new metrics and testing documentation ([#271](https://github.com/kubernetes-sigs/node-readiness-controller/pull/271))
+
+### Images
+
+The following container images are published as part of this release.
+
+```
+// Node readiness controller
+registry.k8s.io/node-readiness-controller/node-readiness-controller:v0.4.1
+
+// Report component readiness condition from the node
+registry.k8s.io/node-readiness-controller/node-readiness-reporter:v0.4.1
+```
+
+### Contributors
+
+- ajaysundar.k
+- Anurag Pathak
+- Arunit Chakraborty
+- Avinesh Tripathi
+- Dorothy
+- Himanshu Choudhary
+- Justin
+- Karthik Bhat
+- Mohammad Faraz
+- Priyanka Saggu
+- Rawad Hossain
+- Sahitya Chandra
+- Shreya2005-2005
+- Sujal Shah
+- Vishnu Kothakapu
+- Vitor Floriano
 
 ## v0.3.0
 
