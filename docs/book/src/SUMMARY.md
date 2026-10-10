@@ -19,6 +19,7 @@
 - [Constrained Impersonation](./examples/constrained-impersonation.md)
 
 - [Kubelet Serving Certificate](./examples/kubelet-cert-readiness.md)
+- [Static Pod Readiness](./examples/staticpods-readiness.md)
 
 # Releases
 
