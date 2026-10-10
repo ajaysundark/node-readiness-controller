@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: static-pod-mirror-check, namespace: kube-system}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: {name: static-pod-mirror-check}
+rules:
+  - {apiGroups: [""], resources: [pods], verbs: [get]}
+  - {apiGroups: [""], resources: [nodes/status], verbs: [patch]}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: static-pod-mirror-check}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: static-pod-mirror-check}
+subjects: [{kind: ServiceAccount, name: static-pod-mirror-check, namespace: kube-system}]
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata: {name: static-pod-mirror-check, namespace: kube-system}
+spec:
+  selector:
+    matchLabels: {app: static-pod-mirror-check}
+  template:
+    metadata:
+      labels: {app: static-pod-mirror-check}
+    spec:
+      serviceAccountName: static-pod-mirror-check
+      priorityClassName: system-node-critical
+      nodeSelector: {kubernetes.io/os: linux}   # same nodes as the rule
+      tolerations:
+        - operator: Exists                       # must run on held nodes
+      initContainers:
+        - name: wait-for-mirrors
+          image: <your-registry>/static-pod-mirror-check:v1
+          command: [bash, /wait-for-mirrors.sh]
+          env:
+            - name: NODE_NAME
+              valueFrom: {fieldRef: {fieldPath: spec.nodeName}}
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 128Mi}
+          volumeMounts:
+            - {name: manifests, mountPath: /etc/kubernetes/manifests, readOnly: true}
+      containers:
+        - name: idle
+          image: registry.k8s.io/pause:3.10
+          resources:
+            requests: {cpu: 1m, memory: 8Mi}
+            limits: {memory: 8Mi}
+      volumes:
+        - name: manifests
+          hostPath: {path: /etc/kubernetes/manifests, type: Directory}
