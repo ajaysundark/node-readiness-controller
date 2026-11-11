@@ -1,6 +1,6 @@
 module sigs.k8s.io/node-readiness-controller
 
-go 1.26.6
+go 1.26.11
 
 require (
 	github.com/onsi/ginkgo/v2 v2.32.0
